@@ -358,7 +358,7 @@ fi
 }
 
 # Проверяем наличие файла
-if [[ -f $DIRP/$ICP/readme.rus.txt ]] || [[ -f $DIRP/$ICP/readme.eng.txt ]]
+if [[ -f $DIRP/$ICP/README.md ]] || [[ -f $DIRP/$ICP/changes.eng.txt ]]
 then
    git_commit
    message source_code_ok
@@ -393,7 +393,7 @@ else
       message checking_loaded_files
       sleep 0.1
       # Наличие файла
-      if [[ -f $DIRP/$ICP/readme.rus.txt ]] || [[ -f $DIRP/$ICP/readme.eng.txt ]]
+      if [[ -f $DIRP/$ICP/README.md ]] || [[ -f $DIRP/$ICP/changes.eng.txt ]]
       then
          # Ничего не делаем
          sleep 0.1
@@ -421,7 +421,7 @@ else
          message loading_sources
          git_clone_p
          # Проверяем загрузку
-         if [[ -f $DIRP/$ICP/readme.rus.txt ]] || [[ -f $DIRP/$ICP/readme.eng.txt ]]
+         if [[ -f $DIRP/$ICP/README.md ]] || [[ -f $DIRP/$ICP/changes.eng.txt ]]
          then
             # Ничего не делаем
             git_commit
