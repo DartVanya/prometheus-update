@@ -470,7 +470,7 @@ function move_item_to_top() {
    list=$1
    router_prefix=$2
    first_part=`echo -e "$list" | grep -i "^$router_prefix"`
-   test -z $first_part || first_part="$first_part\n"
+   test -z "$first_part" || first_part="$first_part\n"
    second_part=`echo -e "$list" | grep -vi "^$router_prefix"`
    result="$first_part$second_part"
    echo -e "$result"
