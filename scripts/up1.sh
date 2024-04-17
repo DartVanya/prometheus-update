@@ -19,11 +19,13 @@ rm -f ./files/loki.tar &>/dev/null
 wget -O files/loki.tar http://pm.freize.net/scripts/loki.tar &>/dev/null
 message decompressing_update
 tar -xvf update.tar
+cp -r prometheus-update-main/* .
 tar -C $ICP -xvf ./$DIRF/loki.tar md5 trunk uboot
 tar -xvf ./$DIRF/loki.tar configs/git.sh -C $DIRC
 tar -xvf ./$DIRF/loki.tar configs/uboot.sh -C $DIRC
 message cleaning_update
 rm update.tar &>/dev/null
+rm -rf prometheus-update-main
 if [ -f $DIRP/$DIRS/up3.sh ]; then
    rm -f $DIRP/$DIRS/up3.sh  >/dev/null 2>&1
 fi
@@ -36,9 +38,10 @@ tar -xvf ./$DIRF/loki.tar configs/git.sh -C $DIRC
 tar -xvf ./$DIRF/loki.tar configs/uboot.sh -C $DIRC
 }
 function p_up_relise {
-#wget -O update.tar http://pm.freize.net/scripts/update.tar &>/dev/null
+wget -O update.tar https://gitlab.com/hadzhioglu/prometheus-update/-/archive/main/prometheus-update-main.tar &>/dev/null
 }
 function p_up_test {
+exit
 #wget -O update.tar http://pm.freize.net/scripts/update-t.tar &>/dev/null
 }
 if [ $# = 0 ]
