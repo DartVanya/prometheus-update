@@ -53,14 +53,14 @@ while true; do
                  sleep 0.1
               fi
               cd $DIRP/$ICP/trunk
-              if [[ "$ICP" == *"padavan-fw"* ]]; then
+              if [[ "$ICP" == *"padavan-ng"* ]]; then
                  ./clear_tree.sh
               else
                  ./clear_tree
               fi
               cd $DIRP/$ICP/
               git checkout .
-              if [[ "$stable" = "STABLE" && "$ICP" != *"padavan-fw"* ]]
+              if [[ "$stable" = "STABLE" && "$ICP" != *"padavan-ng"* ]]
               then
                  git checkout -f $revisiongit  >/dev/null
               fi

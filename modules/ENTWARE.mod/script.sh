@@ -10,6 +10,14 @@ MOD_NAME=ENTWARE.mod
 . ./configs/script.config.sh
 . ./modules/$MOD_NAME/common.sh
 . ./configs/routers/$ROUTERS.sh
+if [ -n "$ssh_ident" ]
+then
+   SSH_CMD="ssh -i ""$ssh_ident"""
+   SCP_CMD="scp -i ""$ssh_ident"""
+else
+   SSH_CMD="sshpass -p ""$PWDR"" ssh"
+   SCP_CMD="sshpass -p ""$PWDR"" scp"
+fi
 # including localization routines
 . ./scripts/localization.sh
 ################################################################
@@ -62,20 +70,20 @@ function get_entware_from_connected_router {
 
     # test router's connection
     message testing_router_connection
-    sshpass -p "$PWDR" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$ROOTWRT"@"$IPWRT" "cd /tmp"
+    $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$ROOTWRT"@"$IPWRT" "cd /tmp"
     [ $? -ne 0 ] && rise_error "`message_n cant_get_access_to_the_router`"
 
     # compress entware (preserve links) on the router
     message compressing_router_entware
-    sshpass -p "$PWDR" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$ROOTWRT"@"$IPWRT" "cd /opt; tar -zcvf /tmp/entware.tar.gz $TARGET_PATHS"
+    $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$ROOTWRT"@"$IPWRT" "cd /opt; tar -zcvf /tmp/entware.tar.gz $TARGET_PATHS"
 
     # move to vm
     message copying_entware_from_router_to_firmware
-    sshpass -p "$PWDR" scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$ROOTWRT"@"$IPWRT":"/tmp/entware.tar.gz" "$DIRP/$ICP/trunk/user/entware/"
+    $SCP_CMD -P $ssh_port -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$ROOTWRT"@"$IPWRT":"/tmp/entware.tar.gz" "$DIRP/$ICP/trunk/user/entware/"
 
     # cleanup router
     message cleaning_router_temp_directory
-    sshpass -p "$PWDR" ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$ROOTWRT"@"$IPWRT" rm -f /tmp/entware.tar.gz
+    $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$ROOTWRT"@"$IPWRT" rm -f /tmp/entware.tar.gz
 }
 
 function get_entware_from_path {

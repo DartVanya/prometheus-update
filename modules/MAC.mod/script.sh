@@ -9,6 +9,12 @@ cd $DIRP
 . ./configs/script.config.sh
 . ./scripts/localization.sh
 . ./configs/routers/$ROUTERS.sh
+if [ -n "$ssh_ident" ]
+then
+   SSH_CMD="ssh -i ""$ssh_ident"""
+else
+   SSH_CMD="sshpass -p ""$PWDR"" ssh"
+fi
 ################################################################
 function generator() {
 #statements
@@ -33,6 +39,8 @@ macadd="${octets}:${octeta}:${octetb}:${octetc}"
 #concatenate values and add dashes
 echo $macadd
 }
+export_script_mac="lan_eeprom_mac | grep 'MAC address' ; wan_eeprom_mac | grep 'MAC address' ; radio2_eeprom_mac | grep 'MAC address' ; radio5_eeprom_mac | grep 'MAC address';"
+connect; message current_mac_addresses; $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT $export_script_mac
 message please_enter_the_first_mac
 while true; do
    read MAC1
@@ -72,7 +80,7 @@ export_script_mac="lan_eeprom_mac $MAC1 ; wan_eeprom_mac $MAC2 ; radio2_eeprom_m
 while true; do
    read -p "`message_n confirm_the_input_addresses`" yn
    case $yn in
-      [Yy]* ) connect ; sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT $export_script_mac ; message addresses_have_changed ; break;;
+      [Yy]* ) $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT $export_script_mac ; message addresses_have_changed ; break;;
       [Nn]* ) break;;
       * ) message please_enter_yes_or_no;;
    esac

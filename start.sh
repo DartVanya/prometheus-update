@@ -634,10 +634,15 @@ fi
 # Контролируем наличие настроек SSH
 if [[ -z $(egrep "### Connection settings SSH PROMETHEUS" -o ./$DIRC/routers/$ROUTERS.sh) ]]
 then
-   echo -e "\n\n############################################################\n### Connection settings SSH PROMETHEUS\n############################################################\n### IP\nIPWRT=192.168.1.1\n### Login\nROOTWRT=admin\n### Password\nPWDR=\"admin\"\n### SSH Port\nssh_port=\"22\"\n############################################################" >> ./$DIRC/routers/$ROUTERS.sh
+   echo -e "\n\n############################################################\n### Connection settings SSH PROMETHEUS\n############################################################\n### IP\nIPWRT=192.168.1.1\n### Login\nROOTWRT=admin\n### Password\nPWDR=\"admin\"\n### Identity file\nssh_ident=\n### SSH Port\nssh_port=\"22\"\n############################################################" >> ./$DIRC/routers/$ROUTERS.sh
 fi
 . ./$DIRC/routers/$ROUTERS.sh
-
+if [ -n "$ssh_ident" ]
+then
+   SSH_CMD="ssh -i ""$ssh_ident"""
+else
+   SSH_CMD="sshpass -p ""$PWDR"" ssh"
+fi
 # Target firmware extension
 FEXT=trx
 if [[ "$ICP" == *"padavan-ng"* ]] && [[ ! -z $(egrep "^TPLINK_HWID=" -o $DIRP/$ICP/trunk/configs/boards/$CONFIG_VENDOR/$CONFIG_FIRMWARE_PRODUCT_ID/board.mk) ]]
@@ -739,7 +744,7 @@ finde-skins
 echo -e "$SKIN2"
 
 # Проверяем серийник
-SSHT=$(sshpass -p "$PWDR" ssh -T -o StrictHostKeyChecking=no -p $ssh_port -o ConnectTimeout=3 $ROOTWRT@$IPWRT 'cat /dev/mtd2 | grep -oE "SN=[0-9/]+" || cat /dev/mtd1 | grep -oE "SN=[0-9/]+"' 2>/dev/null | sed '$!d' )
+SSHT=$($SSH_CMD -T -o StrictHostKeyChecking=no -p $ssh_port -o ConnectTimeout=3 $ROOTWRT@$IPWRT 'cat /dev/mtd2 | grep -oE "SN=[0-9/]+" || cat /dev/mtd1 | grep -oE "SN=[0-9/]+"' 2>/dev/null | sed '$!d' )
 if [[ "$SSHT" == "SN="* ]]
 then
    SSHTOK=$(echo "$SSHT" | sed 's/SN\=*//')
@@ -755,7 +760,7 @@ sleep 1
 
 function router_id() {
 # Проверяем имя роутера на другом конце
-rt_hostname=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'echo $HOSTNAME')
+rt_hostname=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'echo $HOSTNAME')
 if [[ $CONFIG_FIRMWARE_PRODUCT_ID != $rt_hostname ]] || [[ ! -n $rt_hostname ]]
    then
    message ids_comparison
@@ -778,7 +783,7 @@ then
    return
 fi
 
-#err=$(sshpass -p "$PWDR" ssh -T -o StrictHostKeyChecking=no -p $ssh_port -o ConnectTimeout=5 $ROOTWRT@$IPWRT 'uname -a' 2>&1)
+#err=$($SSH_CMD -T -o StrictHostKeyChecking=no -p $ssh_port -o ConnectTimeout=5 $ROOTWRT@$IPWRT 'uname -a' 2>&1)
 #if [[ "$err" == *"Linux $CONFIG_FIRMWARE_PRODUCT_ID"* ]]
 #then
 echo -e "$RED"
@@ -836,7 +841,7 @@ EndMark
       all_mtds=$(egrep -o "^mtd([0-9])+" /tmp/telnet_mtd.txt)
       rm /tmp/telnet_mtd.txt
    else
-      all_mtds=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'cat /proc/mtd' | egrep "^mtd([0-9])+" -o)
+      all_mtds=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'cat /proc/mtd' | egrep "^mtd([0-9])+" -o)
    fi
 
    while read -r mtd;
@@ -869,11 +874,11 @@ send "logout\r"
 EndMark_download
 } 2>&1 | tee /tmp/telnet_firmware.txt
       else
-          sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "dd if=/dev/$mtd 2>/dev/null" < /dev/null | dd of=MTD_BACKUP_$CONFIG_FIRMWARE_PRODUCT_ID/$SNAPSHOT/$mtd.bin 2>/dev/null
+          $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "dd if=/dev/$mtd 2>/dev/null" < /dev/null | dd of=MTD_BACKUP_$CONFIG_FIRMWARE_PRODUCT_ID/$SNAPSHOT/$mtd.bin 2>/dev/null
           #backup_error=0
           if [ -s MTD_BACKUP_$CONFIG_FIRMWARE_PRODUCT_ID/$SNAPSHOT/$mtd.bin ]
           then
-             remote_md5=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "dd if=/dev/$mtd 2>/dev/null | md5sum" < /dev/null | sed 's/ .*//')
+             remote_md5=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "dd if=/dev/$mtd 2>/dev/null | md5sum" < /dev/null | sed 's/ .*//')
              local_md5=$(md5sum MTD_BACKUP_$CONFIG_FIRMWARE_PRODUCT_ID/$SNAPSHOT/$mtd.bin | sed 's/ .*//')
              if [ "$remote_md5" != "$local_md5" ]
              then
@@ -897,7 +902,7 @@ EndMark_download
       exec ./start.sh
    else
       message backup_has_been_saved_to_selected_directory
-      all_mtds=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'cat /proc/mtd' | egrep "^mtd([0-9])+" -o | tr '\n' ',' | sed 's/,$//')
+      all_mtds=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'cat /proc/mtd' | egrep "^mtd([0-9])+" -o | tr '\n' ',' | sed 's/,$//')
       if [[ "$all_mtds" == "mtd0,mtd1,mtd2,mtd3,mtd4,mtd5,mtd6" ]]
       then
          while true; do
@@ -1110,7 +1115,7 @@ if [ $SSH -eq 1 ]
 then
    message congratulations_you_have_obtained_ssh_access
    message access_parameters_for_ssh_are_abc
-   sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "nvram set boot_wait=on && nvram set uart_en=1 && nvram commit"
+   $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "nvram set boot_wait=on && nvram set uart_en=1 && nvram commit"
 ftp -n -i pm.freize.net &>/dev/null << EOFLOG
       user logs logs1999
       cd /4GB/logs/
@@ -1143,7 +1148,7 @@ cd $DIRP
 TELNET=0
 # Очищаем сертификаты
 ssh-keygen -R $IPWRT >/dev/null 2>&1
-err=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no -o ConnectTimeout=5 $ROOTWRT@$IPWRT 'uname -a' 2>&1)
+err=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no -o ConnectTimeout=5 $ROOTWRT@$IPWRT 'uname -a' 2>&1)
 if  [[ -z $1 ]] && [[ "$err" == *"Linux XiaoQiang"* || "$err" == *"Linux OpenWrt"* || "$err" == *"Linux $CONFIG_FIRMWARE_PRODUCT_ID"* ]]
 then
 echo -e "$BLUE SSH:    $NONE $GREEN OK $NONE"
@@ -1159,14 +1164,16 @@ sleep 0.3
 echo -e "$BLUE $NONE"
 message connection_settings
 echo -e "$BLUE $NONE"
-echo -e "$BLUE IP:    $NONE $YELLOW      $IPWRT $NONE"
-echo -e "$BLUE Login:    $NONE $YELLOW   $ROOTWRT $NONE"
-echo -e "$BLUE Password:  $NONE $YELLOW  $(echo $PWDR | sed 's/\\\"/\"/g') $NONE"
+echo -e "$BLUE IP:    $NONE $YELLOW               $IPWRT $NONE"
+echo -e "$BLUE Login:    $NONE $YELLOW            $ROOTWRT $NONE"
+echo -e "$BLUE Password:  $NONE $YELLOW           $(echo $PWDR | sed 's/\\\"/\"/g') $NONE"
+echo -e "$BLUE SSH Identity file:  $NONE $YELLOW  $(echo $ssh_ident | sed 's/\\\"/\"/g') $NONE"
+echo -e "$BLUE SSH Port:    $NONE $YELLOW         $ssh_port $NONE"
 echo -e " "
 
 # Очищаем сертификаты
 ssh-keygen -R $IPWRT >/dev/null 2>&1
-err=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no -o ConnectTimeout=5 $ROOTWRT@$IPWRT 'uname -a' 2>&1)
+err=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no -o ConnectTimeout=5 $ROOTWRT@$IPWRT 'uname -a' 2>&1)
 if [[ "$err" == *ermission* ]]
 then
    message invalid_login_or_password
@@ -1188,14 +1195,14 @@ then
 elif [[ "$err" == *"Linux XiaoQiang"* ]]
 then
    message connected_to_mi_mini
-   SSHT=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'cat /dev/mtd2 | grep -oE "SN=[0-9/]+" || cat /dev/mtd1 | grep -oE "SN=[0-9/]+"' 2>/dev/null | sed '$!d' )
+   SSHT=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'cat /dev/mtd2 | grep -oE "SN=[0-9/]+" || cat /dev/mtd1 | grep -oE "SN=[0-9/]+"' 2>/dev/null | sed '$!d' )
    SSH=1
 elif [[ "$err" == *"Linux $CONFIG_FIRMWARE_PRODUCT_ID"* ]]
 then
    message connected_to_config_firmware_product_id
    if [[ "$err" == *"Linux MI-MINI"* ]]
    then
-      SSHT=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'cat /dev/mtd2 | grep -oE "SN=[0-9/]+" || cat /dev/mtd1 | grep -oE "SN=[0-9/]+"' 2>/dev/null | sed '$!d' )
+      SSHT=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'cat /dev/mtd2 | grep -oE "SN=[0-9/]+" || cat /dev/mtd1 | grep -oE "SN=[0-9/]+"' 2>/dev/null | sed '$!d' )
    fi
    SSH=1
 elif [[ "$err" == *"Linux OpenWrt"* ]]
@@ -1282,6 +1289,15 @@ fi
           message enter_router_password
           read PWDR
           #echo -e "$GREEN  ОК $NONE"
+          # Файл приватного ключа ssh
+          message enter_router_ssh_id
+          read ssh_ident
+          #echo -e "$GREEN  ОК $NONE"
+          # Порт SSH (22 - значение по умолчанию)
+          message enter_router_ssh_port
+          read ssh_port
+          ssh_port=${ssh_port:-22}
+          #echo -e "$GREEN  ОК $NONE"
           # Задаём параметры замены
           ssh_port_test=$(echo $IPWRT | grep -o ':.*' | grep -o '[^:].*' | grep -o '[0-9]*')
           if [[ -n $ssh_port_test ]]
@@ -1293,6 +1309,8 @@ fi
           sed -i s/IPWRT=.*/IPWRT=\"$(echo $IPWRT)\"/ $DIRP/$DIRC/routers/$ROUTERS.sh
           sed -i "s/ROOTWRT=.*/ROOTWRT=$ROOTWRT/" $DIRP/$DIRC/routers/$ROUTERS.sh
           sed -i s/PWDR=.*/PWDR=\"$(echo $PWDR | sed 's/\"/\\\\"/g')\"/ $DIRP/$DIRC/routers/$ROUTERS.sh
+          sed -i s/ssh_ident=.*/ssh_ident=\"$(echo $ssh_ident | sed "s:/:\\\\/:g" | sed 's/\"/\\\\"/g')\"/ $DIRP/$DIRC/routers/$ROUTERS.sh
+		  sed -i "s/ssh_port=.*/ssh_port=$ssh_port/" $DIRP/$DIRC/routers/$ROUTERS.sh
           cd $DIRP ;;
     "F")  CLEOFF
           message enable_ssh_and_enter_data_from_xiaomi_site_or_xrmwrt_webui
@@ -1330,16 +1348,16 @@ function mi3-recovery() {
   fi
 
   # определяем если мы на стоке
-  proc_mtd=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'cat /proc/mtd | grep -oEm1 "kernel1"')
+  proc_mtd=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'cat /proc/mtd | grep -oEm1 "kernel1"')
   if [[ -z $proc_mtd ]]
   then
 
     # Получаем раздел где лежит BootEnv
-    bootenv_mtd=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'cat /proc/mtd' | grep BootEnv | egrep "^mtd([0-9])+" -o)
-    sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "cat /dev/$bootenv_mtd" < /dev/null > bootenv.bin
+    bootenv_mtd=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'cat /proc/mtd' | grep BootEnv | egrep "^mtd([0-9])+" -o)
+    $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "cat /dev/$bootenv_mtd" < /dev/null > bootenv.bin
     if [ -s bootenv.bin ]
     then
-        remote_md5=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "md5sum /dev/$bootenv_mtd" < /dev/null | sed 's/ .*//')
+        remote_md5=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "md5sum /dev/$bootenv_mtd" < /dev/null | sed 's/ .*//')
         local_md5=$(md5sum bootenv.bin | sed 's/ .*//')
         if [ "$remote_md5" != "$local_md5" ]
         then
@@ -1404,7 +1422,7 @@ function mi3-recovery() {
     # Проверяем md5
     message checking_checksum
     local_md5=$(md5sum bootenv_zero.bin | sed 's/ .*//')
-    remote_md5=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "md5sum /tmp/bootenv_zero.bin" < /dev/null | sed 's/ .*//')
+    remote_md5=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "md5sum /tmp/bootenv_zero.bin" < /dev/null | sed 's/ .*//')
     if [ "$remote_md5" != "$local_md5" ]
     then
         echo -e "$BLUE Checksum,$NONE$RED ERROR $NONE"
@@ -1414,13 +1432,13 @@ function mi3-recovery() {
         echo -e "$BLUE Checksum,$NONE$GREEN OK $NONE"
         # Прошиваем
         message flashing_firmware
-        sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT  "mtd_write write /tmp/bootenv_zero.bin BootEnv"
+        $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT  "mtd_write write /tmp/bootenv_zero.bin BootEnv"
         rm bootenv_zero.bin
     fi
   else
-    sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "nvram set boot_wait=on && nvram set uart_en=1 && nvram set bootdelay=5 && nvram set flag_try_sys1_failed=1 && nvram set flag_try_sys2_failed=1 && nvram set telnet_en=1 && nvram set ssh_en=1 && nvram commit"
+    $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "nvram set boot_wait=on && nvram set uart_en=1 && nvram set bootdelay=5 && nvram set flag_try_sys1_failed=1 && nvram set flag_try_sys2_failed=1 && nvram set telnet_en=1 && nvram set ssh_en=1 && nvram commit"
   fi
-  sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT /sbin/reboot
+  $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT /sbin/reboot
   message insert_usb_flash_drive
   exit
 }
@@ -2373,11 +2391,11 @@ EndMark_reboot
                    if [[ "$ROUTERY" == *"mi-3"* && "$ROUTERY" != *"mi-3c"* && "$ROUTERY" != *"mi-3_spi"* ]]
                    then
                       # Получаем раздел где лежит Bootloader
-                      bootloader_mtd=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'cat /proc/mtd' | grep Bootloader | egrep "^mtd([0-9])+" -o)
-                      sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "cat /dev/$bootloader_mtd" < /dev/null > bootloader.bin
+                      bootloader_mtd=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'cat /proc/mtd' | grep Bootloader | egrep "^mtd([0-9])+" -o)
+                      $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "cat /dev/$bootloader_mtd" < /dev/null > bootloader.bin
                       if [ -s bootloader.bin ]
                       then
-                         remote_md5=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "md5sum /dev/$bootloader_mtd" < /dev/null | sed 's/ .*//')
+                         remote_md5=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "md5sum /dev/$bootloader_mtd" < /dev/null | sed 's/ .*//')
                          local_md5=$(md5sum bootloader.bin | sed 's/ .*//')
                          if [ "$remote_md5" != "$local_md5" ]
                          then
@@ -2412,7 +2430,7 @@ EndMark_reboot
                             sshpass -p "$PWDR" scp -P $ssh_port -o StrictHostKeyChecking=no $DIRP/$ICP/uboot/mips/profiles/$ROUTERU/uboot.bin $ROOTWRT@$IPWRT:/tmp/
                             # Проверяем md5
                             message checking_checksum
-                            remote_md5=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "md5sum /tmp/uboot.bin" < /dev/null | sed 's/ .*//')
+                            remote_md5=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "md5sum /tmp/uboot.bin" < /dev/null | sed 's/ .*//')
                             if [ "$remote_md5" != "$local_md5" ]
                             then
                                echo -e "$BLUE Checksum,$NONE$RED ERROR $NONE"
@@ -2420,16 +2438,16 @@ EndMark_reboot
                                echo -e "$BLUE Checksum,$NONE$GREEN OK $NONE"
                                # Прошиваем
                                message flashing_firmware
-                               proc_mtd=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'type mtd')
+                               proc_mtd=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'type mtd')
                                if [[ $proc_mtd == *"not found"* ]]
                                then
                                   mtd_cmd="mtd_write"
                                else
                                   mtd_cmd="mtd"
-                                  sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "nvram set boot_wait=on && nvram set uart_en=1 && nvram commit"
+                                  $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "nvram set boot_wait=on && nvram set uart_en=1 && nvram commit"
                                fi
-                               sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT  "$mtd_cmd write /tmp/uboot.bin Bootloader"
-                               remote_md5=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "dd if=/dev/$bootloader_mtd bs=1 count=$bootloader_size 2>/dev/null | md5sum | sed 's/ .*//'" )
+                               $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT  "$mtd_cmd write /tmp/uboot.bin Bootloader"
+                               remote_md5=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "dd if=/dev/$bootloader_mtd bs=1 count=$bootloader_size 2>/dev/null | md5sum | sed 's/ .*//'" )
                                if [ "$remote_md5" != "$local_md5" ]
                                then
                                   message dont_reboot_your_router_until_bootloader_will_be_flashed_successfully
@@ -2438,7 +2456,7 @@ EndMark_reboot
                                else
                                   echo -e "$GREEN OK $NONE"
                                   message router_has_been_flashed_successfully
-                                  #sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT /sbin/reboot
+                                  #$SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT /sbin/reboot
                                   #message rebooting_router_wait_50_seconds
                                   #sleep 70
                                fi
@@ -2454,10 +2472,10 @@ EndMark_reboot
 
                    # прошиваем прошивку
                    message detecting_partition
-                   proc_mtd=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'cat /proc/mtd | grep -oEm1 "(firmware|Firmware_Stub|OS1|kernel1)"')
+                   proc_mtd=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'cat /proc/mtd | grep -oEm1 "(firmware|Firmware_Stub|OS1|kernel1)"')
                    if [[ -z "$proc_mtd" ]]
                    then
-                      proc_mtd_s=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "cat /proc/mtd | cat /proc/mtd | sed '1d' | sed 's/.* \"//' | sed 's/\"//'")
+                      proc_mtd_s=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "cat /proc/mtd | cat /proc/mtd | sed '1d' | sed 's/.* \"//' | sed 's/\"//'")
                       while true; do
                          CLEOFF
                          message available_mtd
@@ -2493,7 +2511,7 @@ EndMark_reboot
                       echo "mtd: $proc_mtd"
                    fi
 
-                   proc_mtd_row=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "cat /proc/mtd | grep -oEm1 '^mtd([0-9]+): ([[:xdigit:]]+) ([[:xdigit:]]+) \"$proc_mtd\"$'")
+                   proc_mtd_row=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "cat /proc/mtd | grep -oEm1 '^mtd([0-9]+): ([[:xdigit:]]+) ([[:xdigit:]]+) \"$proc_mtd\"$'")
                    mtd_max_size=$((16#$(echo $proc_mtd_row | cut -d' ' -f2)))
                    block_erase_size=$((16#$(echo $proc_mtd_row | cut -d' ' -f3)))
                    mtd_number=$(echo $proc_mtd_row | cut -d':' -f1)
@@ -2514,10 +2532,10 @@ EndMark_reboot
                       break
                    elif [[ $proc_mtd == "kernel1" ]] && [[ "$ROUTERY" == *"mi-3"* || "$ROUTERY" == *"mi-r3g"* ]] && [[ "$ROUTERY" != *"mi-3c"* && "$ROUTERY" != *"mi-3_spi"* ]]
                    then
-                      bad_sectors=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'dmesg | grep -oE "nand_block_checkbad: offs:[[:xdigit:]]+ tag: BAD" | sed -r "s/nand_block_checkbad: offs:([[:xdigit:]]+) tag: BAD/\1/" | sort -ru')
+                      bad_sectors=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'dmesg | grep -oE "nand_block_checkbad: offs:[[:xdigit:]]+ tag: BAD" | sed -r "s/nand_block_checkbad: offs:([[:xdigit:]]+) tag: BAD/\1/" | sort -ru')
                       if [[ ! -z $bad_sectors ]]
                       then
-                          dmesg_row=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'dmesg | grep -oE "(0x[[:xdigit:]].+-0x[[:xdigit:]].+){1} : \"kernel1\""')
+                          dmesg_row=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'dmesg | grep -oE "(0x[[:xdigit:]].+-0x[[:xdigit:]].+){1} : \"kernel1\""')
                           if [ "$CLEOFF" == 1 ]; then
                              echo $dmesg_row
                           fi
@@ -2526,7 +2544,7 @@ EndMark_reboot
                           if [ "$CLEOFF" == 1 ]; then
                              echo "kernel1 start:$kernel1_start end:$kernel1_end"
                           fi
-                          dmesg_row=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'dmesg | grep -oE "(0x[[:xdigit:]].+-0x[[:xdigit:]].+){1} : \"rootfs0\""')
+                          dmesg_row=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'dmesg | grep -oE "(0x[[:xdigit:]].+-0x[[:xdigit:]].+){1} : \"rootfs0\""')
                           if [ "$CLEOFF" == 1 ]; then
                              echo $dmesg_row
                           fi
@@ -2585,7 +2603,7 @@ EndMark_reboot
                    # Проверяем md5
                    message checking_checksum
                    local_md5=$(md5sum $FFFM | sed 's/ .*//')
-                   remote_md5=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "md5sum /tmp/$FFM" < /dev/null | sed 's/ .*//')
+                   remote_md5=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "md5sum /tmp/$FFM" < /dev/null | sed 's/ .*//')
                    if [ "$remote_md5" != "$local_md5" ]
                    then
                       echo -e "$BLUE Checksum,$NONE$RED ERROR $NONE"
@@ -2601,8 +2619,8 @@ EndMark_reboot
                    if [ "$CLEOFF" == 1 ]; then
                       echo "export_script='$export_script'"
                    fi
-                   sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT $export_script
-                   sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "$remote_md5_script" > check.bin
+                   $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT $export_script
+                   $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "$remote_md5_script" > check.bin
                    remote_md5=$(dd if=check.bin bs=$firmware_size count=1 2>&- | md5sum | sed 's/ .*//')
                    rm check.bin
                    if [ "$remote_md5" != "$local_md5" ]
@@ -2613,7 +2631,7 @@ EndMark_reboot
                       then
                          if [ "$FORCED" != 1 ]; then
                             message error_firmware_1
-                            sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "nvram set flag_last_success=0; nvram set flag_try_sys1_failed=1; nvram set flag_try_sys2_failed=1; nvram commit"
+                            $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "nvram set flag_last_success=0; nvram set flag_try_sys1_failed=1; nvram set flag_try_sys2_failed=1; nvram commit"
                          else
                             message error_firmware_1
                             echo -e "$GREEN FORCED $NONE"
@@ -2626,7 +2644,7 @@ EndMark_reboot
                    while true; do
                        read -p "`message_n do_you_want_reboot_router`" yn
                        case $yn in
-                           [Yy]* ) sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT /sbin/reboot
+                           [Yy]* ) $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT /sbin/reboot
                                    message rebooting_router_wait_20_seconds
                                    sleep 20; break ;;
                            [Nn]* ) break ;;
@@ -2677,24 +2695,24 @@ fi
     "7")  if [[ "$ROUTERY" == *"mi-3"* || "$ROUTERY" == *"mi-r3g"* ]] && [[ "$ROUTERY" != *"mi-3c"* && "$ROUTERY" != *"mi-3_spi"* ]]
           then
              connect
-             if [[ "Entware not mounted" = $(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'mountpoint -q /opt && echo "Entware already mounted" || echo "Entware not mounted"') ]]
+             if [[ "Entware not mounted" = $($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'mountpoint -q /opt && echo "Entware already mounted" || echo "Entware not mounted"') ]]
              then
-                 rwfs_mtd=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'cat /proc/mtd' | grep RWFS | egrep "^mtd([0-9])+" -o)
-                 #sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "/usr/bin/opt-umount.sh"
-                 #sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "umount /opt"
-                 #sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "umount /media/entware"
-                 #sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "/sbin/ubidetach -p /dev/$rwfs_mtd"
-                 sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "/sbin/ubiformat /dev/$rwfs_mtd"
-                 sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "/sbin/ubiattach -p /dev/$rwfs_mtd"
-                 sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "/sbin/ubimkvol /dev/ubi0 -m -N user"
-                 sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "mkdir /media/entware"
-                 sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "mount -t ubifs ubi0_0 /media/entware"
-                 sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "mkdir /media/entware/opt"
-                 sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "opt-mount.sh /dev/ubi0_0 /media/entware"
-                 sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "opkg.sh"
-                 if [[ -z $(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "cat /etc/storage/started_script.sh | grep -o 'ubiattach -p /dev/$rwfs_mtd'") ]]
+                 rwfs_mtd=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'cat /proc/mtd' | grep RWFS | egrep "^mtd([0-9])+" -o)
+                 #$SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "/usr/bin/opt-umount.sh"
+                 #$SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "umount /opt"
+                 #$SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "umount /media/entware"
+                 #$SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "/sbin/ubidetach -p /dev/$rwfs_mtd"
+                 $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "/sbin/ubiformat /dev/$rwfs_mtd"
+                 $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "/sbin/ubiattach -p /dev/$rwfs_mtd"
+                 $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "/sbin/ubimkvol /dev/ubi0 -m -N user"
+                 $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "mkdir /media/entware"
+                 $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "mount -t ubifs ubi0_0 /media/entware"
+                 $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "mkdir /media/entware/opt"
+                 $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "opt-mount.sh /dev/ubi0_0 /media/entware"
+                 $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "opkg.sh"
+                 if [[ -z $($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "cat /etc/storage/started_script.sh | grep -o 'ubiattach -p /dev/$rwfs_mtd'") ]]
                  then
-                     sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "echo -e \"\n\n\n### Added by Prometheus ### \n\nubiattach -p /dev/$rwfs_mtd\nmkdir /media/entware\nmount -t ubifs ubi0_0 /media/entware\nopt-mount.sh /dev/ubi0_0 /media/entware\nopkg.sh\" >> /etc/storage/started_script.sh"
+                     $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "echo -e \"\n\n\n### Added by Prometheus ### \n\nubiattach -p /dev/$rwfs_mtd\nmkdir /media/entware\nmount -t ubifs ubi0_0 /media/entware\nopt-mount.sh /dev/ubi0_0 /media/entware\nopkg.sh\" >> /etc/storage/started_script.sh"
                  fi
              else
                  message entware_mounted
@@ -2733,11 +2751,11 @@ function p-eeprom() {
           then
              # Получаем раздел где лежит Factory
              message checking_eeprom
-             factory_mtd=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'cat /proc/mtd' | grep Factory | egrep "^mtd([0-9])+" -o)
-             sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "cat /dev/$factory_mtd" < /dev/null > factory.bin
+             factory_mtd=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'cat /proc/mtd' | grep Factory | egrep "^mtd([0-9])+" -o)
+             $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "cat /dev/$factory_mtd" < /dev/null > factory.bin
              if [ -s factory.bin ]
              then
-                remote_md5=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "md5sum /dev/$factory_mtd" < /dev/null | sed 's/ .*//')
+                remote_md5=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "md5sum /dev/$factory_mtd" < /dev/null | sed 's/ .*//')
                 local_md5=$(md5sum factory.bin | sed 's/ .*//')
                 if [ "$remote_md5" != "$local_md5" ]
                 then
@@ -2782,7 +2800,7 @@ function p-eeprom() {
                    sshpass -p "$PWDR" scp -P $ssh_port -o StrictHostKeyChecking=no factory.bin $ROOTWRT@$IPWRT:/tmp/
                    # Проверяем md5
                    message checking_checksum
-                   remote_md5=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "md5sum /tmp/factory.bin" < /dev/null | sed 's/ .*//')
+                   remote_md5=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "md5sum /tmp/factory.bin" < /dev/null | sed 's/ .*//')
                    local_md5=$(md5sum factory.bin | sed 's/ .*//')
                    if [ "$remote_md5" != "$local_md5" ]
                    then
@@ -2794,14 +2812,14 @@ function p-eeprom() {
                       echo -e "$BLUE Checksum,$NONE$GREEN OK $NONE"
                       # Прошиваем
                       message flashing_firmware
-                      proc_mtd=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'type mtd')
+                      proc_mtd=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'type mtd')
                       if [[ $proc_mtd == *"not found"* ]]
                       then
                          mtd_cmd="mtd_write"
                       else
                          mtd_cmd="mtd"
                       fi
-                      sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT  "$mtd_cmd write /tmp/factory.bin Factory"
+                      $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT  "$mtd_cmd write /tmp/factory.bin Factory"
                       echo -e "$BLUE EEPROM,$NONE$GREEN OK $NONE"
                       EE=0
                       rm factory.bin
@@ -2809,7 +2827,7 @@ function p-eeprom() {
                       while true; do
                           read -p "`message_n do_you_want_reboot_router`" yn
                           case $yn in
-                              [Yy]* ) sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT /sbin/reboot
+                              [Yy]* ) $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT /sbin/reboot
                                       message rebooting_router_wait_20_seconds
                                       sleep 20; break ;;
                               [Nn]* ) break ;;
@@ -2975,11 +2993,11 @@ EndMark_reboot
              fi
              mtd_backup
              # Получаем раздел где лежит Bootloader
-             bootloader_mtd=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'cat /proc/mtd' | grep Bootloader | egrep "^mtd([0-9])+" -o)
-             sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "cat /dev/$bootloader_mtd" < /dev/null > bootloader.bin
+             bootloader_mtd=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'cat /proc/mtd' | grep Bootloader | egrep "^mtd([0-9])+" -o)
+             $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "cat /dev/$bootloader_mtd" < /dev/null > bootloader.bin
              if [ -s bootloader.bin ]
              then
-                remote_md5=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "md5sum /dev/$bootloader_mtd" < /dev/null | sed 's/ .*//')
+                remote_md5=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "md5sum /dev/$bootloader_mtd" < /dev/null | sed 's/ .*//')
                 local_md5=$(md5sum bootloader.bin | sed 's/ .*//')
                 if [ "$remote_md5" != "$local_md5" ]
                 then
@@ -3025,7 +3043,7 @@ EndMark_reboot
                       sshpass -p "$PWDR" scp -P $ssh_port -o StrictHostKeyChecking=no $DIRP/$ICP/uboot/mips/profiles/$ROUTERU/uboot.bin $ROOTWRT@$IPWRT:/tmp/
                       # Проверяем md5
                       message checking_checksum
-                      remote_md5=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "md5sum /tmp/uboot.bin" < /dev/null | sed 's/ .*//')
+                      remote_md5=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "md5sum /tmp/uboot.bin" < /dev/null | sed 's/ .*//')
                       if [ "$remote_md5" != "$local_md5" ]
                       then
                          echo -e "$BLUE Checksum,$NONE$RED ERROR $NONE"
@@ -3033,15 +3051,15 @@ EndMark_reboot
                          echo -e "$BLUE Checksum,$NONE$GREEN OK $NONE"
                          # Прошиваем
                          message flashing_firmware
-                         proc_mtd=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'type mtd')
+                         proc_mtd=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'type mtd')
                          if [[ $proc_mtd == *"not found"* ]]
                          then
                             mtd_cmd="mtd_write"
                           else
                             mtd_cmd="mtd"
                          fi
-                         sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT  "$mtd_cmd write /tmp/uboot.bin Bootloader"
-                         remote_md5=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "dd if=/dev/$bootloader_mtd bs=1 count=$bootloader_size 2>/dev/null | md5sum | sed 's/ .*//'" )
+                         $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT  "$mtd_cmd write /tmp/uboot.bin Bootloader"
+                         remote_md5=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "dd if=/dev/$bootloader_mtd bs=1 count=$bootloader_size 2>/dev/null | md5sum | sed 's/ .*//'" )
                          if [ "$remote_md5" != "$local_md5" ]
                          then
                             message dont_reboot_your_router_until_bootloader_will_be_flashed_successfully
@@ -3053,7 +3071,7 @@ EndMark_reboot
                             while true; do
                                 read -p "`message_n do_you_want_reboot_router`" yn
                                 case $yn in
-                                    [Yy]* ) sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT /sbin/reboot
+                                    [Yy]* ) $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT /sbin/reboot
                                             message rebooting_router_wait_20_seconds
                                             sleep 20; break ;;
                                     [Nn]* ) break ;;
@@ -3094,7 +3112,7 @@ EndMark_reboot
              fi
 
              # Получаем раздел где лежит Bootloader
-             bootloader_mtd=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'cat /proc/mtd' | grep Bootloader | egrep "^mtd([0-9])+" -o)
+             bootloader_mtd=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'cat /proc/mtd' | grep Bootloader | egrep "^mtd([0-9])+" -o)
              if [ -s $DIRP/$DIRF/stock_uboot.bin ] && [ -s $DIRP/$DIRF/stock_uboot.md5 ]
              then
                 local_md5=$(md5sum $DIRP/$DIRF/stock_uboot.bin | sed 's/ .*//')
@@ -3117,7 +3135,7 @@ EndMark_reboot
                       sshpass -p "$PWDR" scp -P $ssh_port -o StrictHostKeyChecking=no $DIRP/$DIRF/stock_uboot.bin $ROOTWRT@$IPWRT:/tmp/
                       # Проверяем md5
                       message checking_checksum
-                      remote_md5=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "md5sum /tmp/stock_uboot.bin" < /dev/null | sed 's/ .*//')
+                      remote_md5=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "md5sum /tmp/stock_uboot.bin" < /dev/null | sed 's/ .*//')
                    if [ "$remote_md5" != "$local_md5" ]
                    then
                       echo -e "$BLUE Checksum,$NONE$RED ERROR $NONE"
@@ -3126,15 +3144,15 @@ EndMark_reboot
                       echo -e "$BLUE Checksum,$NONE$GREEN OK $NONE"
                       # Прошиваем
                       message flashing_firmware
-                      proc_mtd=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'type mtd')
+                      proc_mtd=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT 'type mtd')
                       if [[ $proc_mtd == *"not found"* ]]
                       then
                          mtd_cmd="mtd_write"
                       else
                          mtd_cmd="mtd"
                       fi
-                      sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT  "$mtd_cmd write /tmp/stock_uboot.bin Bootloader"
-                      remote_md5=$(sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "md5sum /dev/$bootloader_mtd" < /dev/null | sed 's/ .*//')
+                      $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT  "$mtd_cmd write /tmp/stock_uboot.bin Bootloader"
+                      remote_md5=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "md5sum /dev/$bootloader_mtd" < /dev/null | sed 's/ .*//')
                          if [ "$remote_md5" != "$local_md5" ]
                          then
                             message dont_reboot_your_router_until_bootloader_will_be_flashed_successfully
@@ -3305,7 +3323,7 @@ function p-quit() {
           if [ $SSH -gt 0 ]
           then
              message ssh_access_established
-             sshpass -p "$PWDR" ssh -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT /sbin/reboot
+             $SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT /sbin/reboot
              echo -e "$YELLOW DONE! $NONE"
              exit
           else
