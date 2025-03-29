@@ -640,8 +640,10 @@ fi
 if [ -n "$ssh_ident" ]
 then
    SSH_CMD="ssh -i ""$ssh_ident"""
+   SCP_CMD="scp -i ""$ssh_ident"""
 else
    SSH_CMD="sshpass -p ""$PWDR"" ssh"
+   SCP_CMD="sshpass -p ""$PWDR"" scp"
 fi
 # Target firmware extension
 FEXT=trx
@@ -1418,7 +1420,7 @@ function mi3-recovery() {
 
     # Загружаем bootenv в роутер
     message uploading_bootenv
-    sshpass -p "$PWDR" scp -P $ssh_port -o StrictHostKeyChecking=no bootenv_zero.bin $ROOTWRT@$IPWRT:/tmp/
+    $SCP_CMD -P $ssh_port -o StrictHostKeyChecking=no bootenv_zero.bin $ROOTWRT@$IPWRT:/tmp/
     # Проверяем md5
     message checking_checksum
     local_md5=$(md5sum bootenv_zero.bin | sed 's/ .*//')
@@ -2427,7 +2429,7 @@ EndMark_reboot
                             message newer_bootloader_with_version_abc_has_been_found
                             # Загружаем загрузчик в роутер
                             message uploading_uboot
-                            sshpass -p "$PWDR" scp -P $ssh_port -o StrictHostKeyChecking=no $DIRP/$ICP/uboot/mips/profiles/$ROUTERU/uboot.bin $ROOTWRT@$IPWRT:/tmp/
+                            $SCP_CMD -P $ssh_port -o StrictHostKeyChecking=no $DIRP/$ICP/uboot/mips/profiles/$ROUTERU/uboot.bin $ROOTWRT@$IPWRT:/tmp/
                             # Проверяем md5
                             message checking_checksum
                             remote_md5=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "md5sum /tmp/uboot.bin" < /dev/null | sed 's/ .*//')
@@ -2598,7 +2600,7 @@ EndMark_reboot
                        fi
                    fi
                    message uploading_firmware
-                   sshpass -p "$PWDR" scp -P $ssh_port -o StrictHostKeyChecking=no $FFFM $ROOTWRT@$IPWRT:/tmp/
+                   $SCP_CMD -P $ssh_port -o StrictHostKeyChecking=no $FFFM $ROOTWRT@$IPWRT:/tmp/
 
                    # Проверяем md5
                    message checking_checksum
@@ -2797,7 +2799,7 @@ function p-eeprom() {
                    printf '\x00' | dd conv=notrunc of=factory.bin bs=1 seek=$((0x804D))
                    # Загружаем EEPROM в роутер
                    message uploading_eeprom
-                   sshpass -p "$PWDR" scp -P $ssh_port -o StrictHostKeyChecking=no factory.bin $ROOTWRT@$IPWRT:/tmp/
+                   $SCP_CMD -P $ssh_port -o StrictHostKeyChecking=no factory.bin $ROOTWRT@$IPWRT:/tmp/
                    # Проверяем md5
                    message checking_checksum
                    remote_md5=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "md5sum /tmp/factory.bin" < /dev/null | sed 's/ .*//')
@@ -3040,7 +3042,7 @@ EndMark_reboot
                    then
                       # Загружаем загрузчик в роутер
                       message uploading_uboot
-                      sshpass -p "$PWDR" scp -P $ssh_port -o StrictHostKeyChecking=no $DIRP/$ICP/uboot/mips/profiles/$ROUTERU/uboot.bin $ROOTWRT@$IPWRT:/tmp/
+                      $SCP_CMD -P $ssh_port -o StrictHostKeyChecking=no $DIRP/$ICP/uboot/mips/profiles/$ROUTERU/uboot.bin $ROOTWRT@$IPWRT:/tmp/
                       # Проверяем md5
                       message checking_checksum
                       remote_md5=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "md5sum /tmp/uboot.bin" < /dev/null | sed 's/ .*//')
@@ -3132,7 +3134,7 @@ EndMark_reboot
                    then
                       # Загружаем загрузчик в роутер
                       message uploading_uboot
-                      sshpass -p "$PWDR" scp -P $ssh_port -o StrictHostKeyChecking=no $DIRP/$DIRF/stock_uboot.bin $ROOTWRT@$IPWRT:/tmp/
+                      $SCP_CMD -P $ssh_port -o StrictHostKeyChecking=no $DIRP/$DIRF/stock_uboot.bin $ROOTWRT@$IPWRT:/tmp/
                       # Проверяем md5
                       message checking_checksum
                       remote_md5=$($SSH_CMD -T -p $ssh_port -o StrictHostKeyChecking=no $ROOTWRT@$IPWRT "md5sum /tmp/stock_uboot.bin" < /dev/null | sed 's/ .*//')
